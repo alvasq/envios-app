@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#2563eb">
+  <title>EnviosApp - Control de Envios</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body>
+
+<!-- Pantalla de login -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-box">
+    <div class="login-icon">📦</div>
+    <h1>EnviosApp</h1>
+    <p>Control de envios, guias y liquidacion</p>
+    <button class="btn btn-google" id="btnLogin">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Iniciar sesion con Google
+    </button>
+  </div>
+</div>
+
+<!-- App principal (oculta hasta login) -->
+<div id="appMain" style="display:none">
+
+  <!-- Header -->
+  <header class="app-header">
+    <h1>EnviosApp</h1>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span class="header-badge" id="offlineBadge" style="display:none">Offline</span>
+      <img id="userAvatar" class="avatar" src="" alt="" style="display:none">
+      <button class="btn-icon" id="btnLogout" title="Cerrar sesion">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Contenido principal -->
+  <div class="main-content">
+
+    <!-- ========== DASHBOARD ========== -->
+    <div class="section active" id="secDashboard">
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+          <div class="stat-value" id="statPendientes">0</div>
+          <div class="stat-label">Pendientes</div>
+        </div>
+        <div class="stat-card warning">
+          <div class="stat-value" id="statEnCamino">0</div>
+          <div class="stat-label">En camino</div>
+        </div>
+        <div class="stat-card success">
+          <div class="stat-value" id="statEntregados">0</div>
+          <div class="stat-label">Entregados hoy</div>
+        </div>
+        <div class="stat-card danger">
+          <div class="stat-value" id="statDineroPendiente">Q0</div>
+          <div class="stat-label">Dinero pendiente</div>
+        </div>
+      </div>
+
+      <h3 style="margin-bottom:10px; font-size:15px;">Proximas entregas</h3>
+      <div id="proximasEntregas">
+        <div class="empty-state"><p>No hay entregas programadas</p></div>
+      </div>
+
+      <h3 style="margin:16px 0 10px; font-size:15px;">Alarmas activas</h3>
+      <div id="alarmasActivas">
+        <div class="empty-state"><p>Sin alarmas</p></div>
+      </div>
+
+      <div id="guiasAlerta" style="margin-top:16px;"></div>
+
+      <!-- Temporal: diagnostico -->
+      <div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--gray-200);">
+        <button class="btn btn-sm btn-primary" onclick="testFirestore()" style="margin-right:8px;">Test Firestore</button>
+        <button class="btn btn-sm btn-outline" onclick="cargarDatosPrueba()" style="margin-right:8px;">Datos de prueba</button>
+        <button class="btn btn-sm btn-danger" onclick="limpiarDatos()">Limpiar todo</button>
+      </div>
+    </div>
+
+    <!-- ========== ENVIOS ========== -->
+    <div class="section" id="secEnvios">
+      <input type="text" class="search-box" id="buscarEnvio" placeholder="Buscar por cliente...">
+      <div class="filtros">
+        <button class="filtro-chip active" data-filtro="todos">Todos</button>
+        <button class="filtro-chip" data-filtro="pendiente">Pendientes</button>
+        <button class="filtro-chip" data-filtro="en_camino">En camino</button>
+        <button class="filtro-chip" data-filtro="entregado">Entregados</button>
+        <button class="filtro-chip" data-filtro="fallido">Fallidos</button>
+      </div>
+      <div id="listaEnvios">
+        <div class="empty-state"><p>No hay envios registrados</p></div>
+      </div>
+    </div>
+
+    <!-- ========== PAQUETES ========== -->
+    <div class="section" id="secGuias">
+      <!-- Alerta de envios sin asignar -->
+      <div id="alertaSinAsignar" style="display:none; margin-bottom:12px;" class="alarma-item urgente">
+        <div class="alarma-titulo" id="alertaSinAsignarTexto"></div>
+        <div class="alarma-detalle">Registra un paquete para asignarlos</div>
+      </div>
+
+      <h3 style="margin-bottom:12px; font-size:15px;">Paquetes de guias (10 envios c/u)</h3>
+      <div id="listaGuias">
+        <div class="empty-state"><p>No hay paquetes registrados</p></div>
+      </div>
+      <button class="btn btn-primary btn-block" onclick="abrirModalGuia()" style="margin-top:12px">+ Registrar paquete pagado</button>
+    </div>
+
+    <!-- ========== LIQUIDACION ========== -->
+    <div class="section" id="secLiquidacion">
+      <div class="liq-resumen">
+        <div class="liq-box cobrado">
+          <div class="valor" id="liqRecibido">Q0</div>
+          <div class="etiqueta">Recibido</div>
+        </div>
+        <div class="liq-box pendiente">
+          <div class="valor" id="liqPorLiquidar">Q0</div>
+          <div class="etiqueta">Por liquidar</div>
+        </div>
+        <div class="liq-box entregado">
+          <div class="valor" id="liqComisiones">Q0</div>
+          <div class="etiqueta">Comisiones</div>
+        </div>
+      </div>
+
+      <!-- Desglose -->
+      <div class="card" style="margin-bottom:12px; font-size:13px;" id="liqDesglose"></div>
+
+      <div class="filtros">
+        <button class="filtro-chip active" data-filtro-liq="todos">Todos</button>
+        <button class="filtro-chip" data-filtro-liq="entregada">Entregadas (sin liquidar)</button>
+        <button class="filtro-chip" data-filtro-liq="liquidada">Liquidadas</button>
+        <button class="filtro-chip" data-filtro-liq="pendiente">En camino / pendiente</button>
+      </div>
+
+      <div id="listaLiquidacion"></div>
+      <button class="btn btn-success btn-block" onclick="liquidarTodas()" style="margin-top:12px" id="btnLiquidarTodas">Liquidar todas las entregadas</button>
+    </div>
+  </div>
+
+  <!-- Botones flotantes -->
+  <div class="fab-container" id="fabContainer">
+    <div class="fab-options" id="fabOptions" style="display:none">
+      <button class="fab-option" onclick="abrirModalGuiaRapida(); cerrarFab();">
+        <span>Guia rapida</span>
+      </button>
+      <button class="fab-option" onclick="abrirModalEnvio(); cerrarFab();">
+        <span>Envio normal</span>
+      </button>
+    </div>
+    <button class="fab" id="fabAgregar" onclick="toggleFab()">+</button>
+  </div>
+
+  <!-- Navegacion inferior -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-sec="secDashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Inicio
+    </button>
+    <button class="nav-item" data-sec="secEnvios">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+      Envios
+    </button>
+    <button class="nav-item" data-sec="secGuias">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Guias
+    </button>
+    <button class="nav-item" data-sec="secLiquidacion">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+      Liquidacion
+    </button>
+  </nav>
+</div>
+
+<!-- ========== MODAL GUIA RAPIDA ========== -->
+<div class="modal-overlay" id="modalGuiaRapida" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Guia rapida</h2>
+      <button class="modal-close" onclick="cerrarModal('modalGuiaRapida')">&times;</button>
+    </div>
+    <form id="formGuiaRapida" onsubmit="guardarGuiaRapida(event)">
+      <div class="form-group">
+        <label>Nombre *</label>
+        <input type="text" id="grNombre" required placeholder="Nombre del cliente">
+      </div>
+      <div class="form-group">
+        <label>Telefono *</label>
+        <input type="tel" id="grTelefono" required placeholder="Numero de telefono">
+      </div>
+      <div class="form-group">
+        <label>Direccion *</label>
+        <textarea id="grDireccion" rows="2" required placeholder="Direccion de entrega"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Total a cobrar (Q) *</label>
+        <input type="number" id="grMonto" step="0.01" min="0" required placeholder="225.00">
+      </div>
+      <div class="form-group">
+        <label>Asignar a paquete</label>
+        <select id="grPaqueteGuia">
+          <option value="">-- Sin asignar (pago despues) --</option>
+        </select>
+      </div>
+
+      <!-- Preview del texto generado -->
+      <div class="gr-preview" id="grPreview" style="display:none">
+        <label style="font-size:13px; font-weight:500; color:var(--gray-700); margin-bottom:4px; display:block;">Texto para enviar al courier:</label>
+        <div class="gr-texto" id="grTexto"></div>
+        <button type="button" class="btn btn-sm btn-outline" onclick="copiarGuiaRapida()" style="margin-top:8px;">Copiar texto</button>
+      </div>
+
+      <div style="display:flex; gap:8px; margin-top:12px;">
+        <button type="button" class="btn btn-primary btn-block" onclick="generarPreviewGR()">Ver texto</button>
+        <button type="button" class="btn btn-success btn-block" onclick="guardarGuiaRapida()">Guardar y copiar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========== MODAL ENVIO ========== -->
+<div class="modal-overlay" id="modalEnvio" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalEnvioTitulo">Nuevo envio</h2>
+      <button class="modal-close" onclick="cerrarModal('modalEnvio')">&times;</button>
+    </div>
+    <form id="formEnvio" onsubmit="guardarEnvio(event)">
+      <input type="hidden" id="envioId">
+      <input type="hidden" id="envioCalendarEventId">
+      <div class="form-group">
+        <label>Cliente *</label>
+        <input type="text" id="envCliente" required placeholder="Nombre del cliente">
+      </div>
+      <div class="form-group">
+        <label>Telefono</label>
+        <input type="tel" id="envTelefono" placeholder="Numero de telefono">
+      </div>
+      <div class="form-group">
+        <label>Direccion *</label>
+        <textarea id="envDireccion" rows="2" required placeholder="Direccion de entrega"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tipo de envio *</label>
+          <select id="envTipo" required onchange="cambiarTipoEnvio()">
+            <option value="personal">Personal</option>
+            <option value="courier">Courier</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Estado</label>
+          <select id="envEstado">
+            <option value="pendiente">Pendiente</option>
+            <option value="en_camino">En camino</option>
+            <option value="entregado">Entregado</option>
+            <option value="fallido">Fallido</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Fecha entrega *</label>
+          <input type="date" id="envFecha" required>
+        </div>
+        <div class="form-group">
+          <label>Hora entrega</label>
+          <input type="time" id="envHora">
+        </div>
+      </div>
+      <div class="form-group" id="grupoGuia" style="display:none">
+        <label>Numero de guia</label>
+        <input type="text" id="envGuia" placeholder="Numero de guia del courier">
+      </div>
+      <div class="form-group" id="grupoPaqueteGuia" style="display:none">
+        <label>Paquete de guias</label>
+        <select id="envPaqueteGuia">
+          <option value="">-- Sin paquete --</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Monto a cobrar (Q)</label>
+          <input type="number" id="envMontoCobrar" step="0.01" min="0" value="0" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>Monto cobrado (Q)</label>
+          <input type="number" id="envMontoCobrado" step="0.01" min="0" value="0" placeholder="0.00">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notas</label>
+        <textarea id="envNotas" rows="2" placeholder="Notas adicionales..."></textarea>
+      </div>
+      <div class="form-group" id="grupoCalendar">
+        <label>
+          <input type="checkbox" id="envCrearCalendar" checked>
+          Crear recordatorio en Google Calendar (15 min antes)
+        </label>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button type="submit" class="btn btn-primary btn-block">Guardar</button>
+        <button type="button" class="btn btn-outline" onclick="cerrarModal('modalEnvio')">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========== MODAL PAQUETE ========== -->
+<div class="modal-overlay" id="modalGuia" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalGuiaTitulo">Registrar paquete</h2>
+      <button class="modal-close" onclick="cerrarModal('modalGuia')">&times;</button>
+    </div>
+    <div id="formGuiaContainer">
+      <div class="form-group">
+        <label>Numero de comprobante *</label>
+        <input type="text" id="guiaComprobante" placeholder="Ej: 1260333914">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Costo del paquete (Q)</label>
+          <input type="number" id="guiaCosto" step="0.01" min="0" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>Fecha de pago</label>
+          <input type="date" id="guiaFechaPago">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notas</label>
+        <textarea id="guiaNotas" rows="2" placeholder="Notas opcionales..."></textarea>
+      </div>
+
+      <!-- Envios sin asignar para vincular -->
+      <div id="enviosSinAsignarContainer" style="display:none; margin-top:12px;">
+        <label style="font-size:13px; font-weight:600; margin-bottom:8px; display:block;">Envios sin paquete asignado:</label>
+        <div id="enviosSinAsignarLista"></div>
+      </div>
+
+      <button type="button" class="btn btn-primary btn-block" onclick="guardarPaquete()" style="margin-top:12px">Guardar paquete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== MODAL DETALLE PAQUETE ========== -->
+<div class="modal-overlay" id="modalDetallePaquete" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Detalle del paquete</h2>
+      <button class="modal-close" onclick="cerrarModal('modalDetallePaquete')">&times;</button>
+    </div>
+    <div id="detallePaqueteContenido"></div>
+  </div>
+</div>
+
+<!-- ========== MODAL DETALLE ENVIO ========== -->
+<div class="modal-overlay" id="modalDetalle" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Detalle del envio</h2>
+      <button class="modal-close" onclick="cerrarModal('modalDetalle')">&times;</button>
+    </div>
+    <div id="detalleContenido"></div>
+  </div>
+</div>
+
+<!-- Diagnostico: detectar si el modulo carga o falla -->
+<script>
+  window._appModuleLoaded = false;
+  window.addEventListener('error', function(e) {
+    if (e.filename && e.filename.includes('app.js')) {
+      document.body.insertAdjacentHTML('beforeend',
+        '<div style="position:fixed;bottom:60px;left:10px;right:10px;background:#dc2626;color:white;padding:12px;border-radius:8px;z-index:9999;font-size:13px;">' +
+        '<strong>ERROR AL CARGAR APP.JS:</strong><br>' + (e.message || 'Error desconocido') +
+        '<br><br>Posible causa: version de Firebase SDK no existe en CDN.' +
+        '</div>');
+    }
+  });
+  // Si despues de 5 segundos el modulo no cargo, avisar
+  setTimeout(function() {
+    if (!window._appModuleLoaded) {
+      document.body.insertAdjacentHTML('beforeend',
+        '<div style="position:fixed;bottom:60px;left:10px;right:10px;background:#f59e0b;color:#000;padding:12px;border-radius:8px;z-index:9999;font-size:13px;">' +
+        '<strong>ADVERTENCIA:</strong> app.js no termino de cargar en 5 segundos.<br>' +
+        'Abre la consola del navegador (F12 > Console) y busca errores en rojo.<br>' +
+        'Posible causa: la version del SDK de Firebase no existe en el CDN.' +
+        '</div>');
+    }
+  }, 5000);
+</script>
+<!-- Firebase SDK -->
+<script type="module" src="app.js"></script>
+</body>
+</html>
