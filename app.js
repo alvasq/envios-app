@@ -710,7 +710,7 @@ function renderEnvios(busqueda = '') {
         <span class="badge badge-${e.estado}">${estadoTexto(e.estado)}</span>
         <span class="badge badge-${e.tipo}">${e.tipo}</span>
         <span>${e.fechaProgramada || ''} ${e.horaProgramada || ''}</span>
-        ${e.numeroGuia ? `<span>Guia: ${esc(e.numeroGuia)}</span>` : ''}
+        ${e.numeroGuia ? `<span><a href="http://rastreo.forzadelivery.com/${encodeURIComponent(e.numeroGuia)}" target="_blank" onclick="event.stopPropagation()" style="color:var(--primary);text-decoration:underline;">Guia: ${esc(e.numeroGuia)}</a></span>` : ''}
       </div>
     </div>
   `).join('');
@@ -732,7 +732,7 @@ window.verDetalle = function(id) {
       ${envio.telefono ? `<p><strong>Telefono:</strong> <a href="tel:${envio.telefono}">${esc(envio.telefono)}</a></p>` : ''}
       <p><strong>Direccion:</strong> ${esc(envio.direccion)}</p>
       <p><strong>Fecha:</strong> ${envio.fechaProgramada || 'Sin fecha'} ${envio.horaProgramada || ''}</p>
-      ${envio.numeroGuia ? `<p><strong>Guia:</strong> ${esc(envio.numeroGuia)}</p>` : ''}
+      ${envio.numeroGuia ? `<p><strong>Guia:</strong> <a href="http://rastreo.forzadelivery.com/${encodeURIComponent(envio.numeroGuia)}" target="_blank" style="color:var(--primary);text-decoration:underline;">${esc(envio.numeroGuia)} (rastrear)</a></p>` : ''}
       ${envio.montoCobrar > 0 ? `<p><strong>Cobrar:</strong> ${formatQ(envio.montoCobrar)}</p>` : ''}
       ${envio.notas ? `<p><strong>Notas:</strong> ${esc(envio.notas)}</p>` : ''}
       ${envio.calendarEventId ? '<p style="font-size:12px;color:var(--success);">Tiene recordatorio en Google Calendar</p>' : ''}
@@ -1049,11 +1049,56 @@ function renderLiquidacion() {
     return;
   }
 
-  contenedor.innerHTML = filtrados.map(e => {
+  // Resumen de pendientes cuando se filtra por "entregada"
+  let resumenPendientes = '';
+  if (filtroLiqActual === 'entregada') {
+    const pendientes = filtrados.filter(i => i.liqEstado === 'entregada');
+    const totalNetoPendiente = pendientes.reduce((sum, e) => sum + e.neto, 0);
+    const totalBrutoPendiente = pendientes.reduce((sum, e) => sum + e.montoCobrar, 0);
+
+    // Agrupar por paquete
+    const porPaquete = {};
+    pendientes.forEach(e => {
+      const paqId = e.paqueteGuiaId || 'sin_paquete';
+      if (!porPaquete[paqId]) porPaquete[paqId] = { envios: [], neto: 0, bruto: 0 };
+      porPaquete[paqId].envios.push(e);
+      porPaquete[paqId].neto += e.neto;
+      porPaquete[paqId].bruto += e.montoCobrar;
+    });
+
+    let desglosePaquetes = '';
+    Object.keys(porPaquete).forEach(paqId => {
+      const grupo = porPaquete[paqId];
+      if (paqId === 'sin_paquete') {
+        desglosePaquetes += `<p style="margin-top:6px;"><strong>Sin paquete asignado:</strong> ${grupo.envios.length} envio(s) - Neto: ${formatQ(grupo.neto)}</p>`;
+      } else {
+        const paquete = guiasCache.find(g => g.id === paqId);
+        const comprobante = paquete ? '#' + paquete.comprobante : 'Paquete desconocido';
+        desglosePaquetes += `<p style="margin-top:6px;"><strong>Paquete ${esc(comprobante)}:</strong> ${grupo.envios.length} envio(s) - Neto: ${formatQ(grupo.neto)}</p>`;
+      }
+    });
+
+    resumenPendientes = `
+      <div class="card" style="margin-bottom:12px; border-left:4px solid var(--warning);">
+        <p style="font-weight:700; font-size:15px; color:var(--warning);">Total pendiente de liquidar: ${formatQ(totalNetoPendiente)}</p>
+        <p style="font-size:13px; color:var(--gray-500);">${pendientes.length} envio(s) - Bruto: ${formatQ(totalBrutoPendiente)}</p>
+        ${desglosePaquetes}
+      </div>
+    `;
+  }
+
+  contenedor.innerHTML = resumenPendientes + filtrados.map(e => {
     let badgeClass = '', badgeText = '';
     if (e.liqEstado === 'liquidada') { badgeClass = 'badge-entregado'; badgeText = 'Liquidada'; }
     else if (e.liqEstado === 'entregada') { badgeClass = 'badge-pendiente'; badgeText = 'Sin liquidar'; }
     else { badgeClass = 'badge-en_camino'; badgeText = estadoTexto(e.estado); }
+
+    // Obtener nombre del paquete
+    let paqueteInfo = '';
+    if (e.paqueteGuiaId) {
+      const paquete = guiasCache.find(g => g.id === e.paqueteGuiaId);
+      if (paquete) paqueteInfo = `Paq #${esc(paquete.comprobante)}`;
+    }
 
     return `
       <div class="envio-item" onclick="verDetalle('${e.id}')">
@@ -1064,7 +1109,8 @@ function renderLiquidacion() {
         <div class="envio-meta">
           <span>Cobrar: ${formatQ(e.montoCobrar)}</span>
           ${e.liqEstado !== 'pendiente' ? `<span>Neto: ${formatQ(e.neto)}</span>` : ''}
-          <span>${e.fechaProgramada || ''}</span>
+          ${paqueteInfo ? `<span>${paqueteInfo}</span>` : ''}
+          ${e.numeroGuia ? `<span><a href="http://rastreo.forzadelivery.com/${encodeURIComponent(e.numeroGuia)}" target="_blank" onclick="event.stopPropagation()" style="color:var(--primary);text-decoration:underline;">Guia: ${esc(e.numeroGuia)}</a></span>` : ''}
         </div>
       </div>
     `;
