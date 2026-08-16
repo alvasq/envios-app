@@ -90,6 +90,7 @@ initFiltros();
 initBusqueda();
 setFechaDefault();
 detectarOnline();
+initTema();
 
 function initNavegacion() {
   document.querySelectorAll('.nav-item').forEach(btn => {
@@ -166,6 +167,30 @@ function detectarOnline() {
   window.addEventListener('online', actualizar);
   window.addEventListener('offline', actualizar);
   actualizar();
+}
+
+function initTema() {
+  const btn = document.getElementById('btnTheme');
+  // Cargar preferencia guardada, o usar la del sistema
+  const guardado = localStorage.getItem('tema');
+  const prefereDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const tema = guardado || (prefereDark ? 'dark' : 'light');
+  aplicarTema(tema);
+
+  btn.addEventListener('click', () => {
+    const actual = document.documentElement.getAttribute('data-theme');
+    const nuevo = actual === 'dark' ? 'light' : 'dark';
+    aplicarTema(nuevo);
+    localStorage.setItem('tema', nuevo);
+  });
+}
+
+function aplicarTema(tema) {
+  document.documentElement.setAttribute('data-theme', tema);
+  document.getElementById('btnTheme').textContent = tema === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+  // Actualizar meta theme-color
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = tema === 'dark' ? '#1e293b' : '#2563eb';
 }
 
 // ===== FIRESTORE - CARGAR DATOS =====
