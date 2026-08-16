@@ -1,5 +1,5 @@
 // Service Worker - EnviosApp
-const CACHE_NAME = 'enviosapp-v3';
+const CACHE_NAME = 'enviosapp-v4';
 const URLS_TO_CACHE = [
   './',
   './index.html',
