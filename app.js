@@ -49,7 +49,7 @@ document.getElementById('btnLogin').addEventListener('click', async () => {
     const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     googleAccessToken = credential.accessToken;
-    sessionStorage.setItem('gAccessToken', googleAccessToken);
+    localStorage.setItem('gAccessToken', googleAccessToken);
   } catch (error) {
     console.error('Error login:', error);
     mostrarToast('Error al iniciar sesion: ' + error.message);
@@ -59,14 +59,14 @@ document.getElementById('btnLogin').addEventListener('click', async () => {
 document.getElementById('btnLogout').addEventListener('click', async () => {
   if (confirm('Cerrar sesion?')) {
     await signOut(auth);
-    sessionStorage.removeItem('gAccessToken');
+    localStorage.removeItem('gAccessToken');
   }
 });
 
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     currentUser = user;
-    googleAccessToken = sessionStorage.getItem('gAccessToken');
+    googleAccessToken = localStorage.getItem('gAccessToken');
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('appMain').style.display = 'block';
 
@@ -394,16 +394,36 @@ window.editarEnvio = function(id) {
 
 // ===== GOOGLE CALENDAR =====
 async function obtenerTokenFresco() {
-  if (googleAccessToken) return googleAccessToken;
-  // Re-autenticar para obtener token
+  // Verificar si el token guardado sigue siendo valido
+  if (googleAccessToken) {
+    try {
+      const test = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=1', {
+        headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+      });
+      if (test.ok) return googleAccessToken;
+      // Token expirado, limpiar
+      googleAccessToken = null;
+      localStorage.removeItem('gAccessToken');
+    } catch {
+      // Sin conexion u otro error, intentar con el token actual
+      return googleAccessToken;
+    }
+  }
+
+  // No hay token valido, pedir al usuario que re-autorice
+  if (!confirm('Se necesita acceso a Google Calendar. Se abrira una ventana para autorizar. ¿Continuar?')) {
+    return null;
+  }
+
   try {
     const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     googleAccessToken = credential.accessToken;
-    sessionStorage.setItem('gAccessToken', googleAccessToken);
+    localStorage.setItem('gAccessToken', googleAccessToken);
     return googleAccessToken;
   } catch (err) {
     console.error('Error obteniendo token:', err);
+    mostrarToast('No se pudo autorizar. Intenta cerrar sesion y volver a entrar.');
     return null;
   }
 }
@@ -455,7 +475,7 @@ async function crearEventoCalendar(envio) {
 
     if (response.status === 401) {
       // Token expirado, reintentar
-      sessionStorage.removeItem('gAccessToken');
+      localStorage.removeItem('gAccessToken');
       googleAccessToken = null;
       const newToken = await obtenerTokenFresco();
       if (!newToken) return null;
