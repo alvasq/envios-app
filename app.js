@@ -170,16 +170,21 @@ function detectarOnline() {
 
 // ===== FIRESTORE - CARGAR DATOS =====
 async function cargarTodo() {
+  let timeoutId;
+  let cargaCompleta = false;
+
   const timeout = new Promise((resolve) => {
-    setTimeout(() => {
-      console.warn('[EnviosApp] cargarTodo timeout - Firestore no respondio en 8s');
-      mostrarToast('Firestore no responde. Usa "Test Firestore" para diagnosticar.');
+    timeoutId = setTimeout(() => {
+      if (!cargaCompleta) {
+        console.warn('[EnviosApp] cargarTodo timeout - Firestore no respondio en 8s');
+        mostrarToast('Firestore no responde. Usa "Test Firestore" para diagnosticar.');
+      }
       resolve();
     }, 8000);
   });
 
   await Promise.race([
-    Promise.all([cargarEnvios(), cargarGuias()]),
+    Promise.all([cargarEnvios(), cargarGuias()]).then(() => { cargaCompleta = true; clearTimeout(timeoutId); }),
     timeout
   ]);
 
